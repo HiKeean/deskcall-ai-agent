@@ -144,6 +144,12 @@ jobs:
         with:
           node-version: "22"
       - run: npm install -g vercel@59
+      - name: Cek akses Vercel
+        run: |
+          echo "ORG_ID: ${#VERCEL_ORG_ID} char, awalan ${VERCEL_ORG_ID:0:5}"
+          echo "PROJECT_ID: ${#VERCEL_PROJECT_ID} char, awalan ${VERCEL_PROJECT_ID:0:4}"
+          vercel whoami --token=${{ secrets.VERCEL_TOKEN }}
+          vercel project ls --scope "$VERCEL_ORG_ID" --token=${{ secrets.VERCEL_TOKEN }}
       - run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
       - run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
       - name: vercel deploy
