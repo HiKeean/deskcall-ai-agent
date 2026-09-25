@@ -1,0 +1,148 @@
+# CI: test agent + api di setiap push/PR.
+# CD (push ke main saja):
+#   - api + agent: build image -> push GHCR -> VM GCP pull & restart via SSH (api di port 5060)
+#   - report: build & deploy ke Vercel lewat Vercel CLI
+#
+# Secrets repo (Settings -> Secrets and variables -> Actions):
+#   VM_HOST            IP VM (34.118.162.198)
+#   VM_USER            user SSH di VM (harus anggota grup docker)
+#   VM_SSH_KEY         private key khusus deploy (public key-nya di ~/.ssh/authorized_keys VM)
+#   VM_SSH_PORT        opsional, default 22
+#   VERCEL_TOKEN       https://vercel.com/account/tokens
+#   VERCEL_ORG_ID      dari report/.vercel/project.json (orgId)
+#   VERCEL_PROJECT_ID  dari report/.vercel/project.json (projectId)
+# Sekali di VM: install Docker, buat ~/deskcall/.env (tidak pernah lewat CI).
+# Env report (DESKCALL_API_URL, DESKCALL_API_KEY) disimpan di project Vercel, bukan di sini.
+name: ci-cd
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-agent:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Unit test
+        working-directory: agent
+        run: PYTHONPATH=src python -m unittest discover -s tests
+
+  test-api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: mvn test
+        working-directory: api
+        run: mvn -B test
+
+  build-push:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: [test-agent, test-api]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      prefix: ${{ steps.meta.outputs.prefix }}
+    strategy:
+      matrix:
+        service: [api, agent]
+    steps:
+      - uses: actions/checkout@v4
+      - id: meta
+        # GHCR wajib huruf kecil
+        run: echo "prefix=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/deskcall" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./${{ matrix.service }}
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.prefix }}-${{ matrix.service }}:latest
+            ${{ steps.meta.outputs.prefix }}-${{ matrix.service }}:${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+
+  deploy:
+    needs: build-push
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency: deploy-vm
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Salin compose ke VM
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          port: ${{ secrets.VM_SSH_PORT || 22 }}
+          source: docker-compose.yml
+          target: deskcall
+      - name: Pull & restart
+        uses: appleboy/ssh-action@v1
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
+          DESKCALL_IMAGE_PREFIX: ${{ needs.build-push.outputs.prefix }}
+          DESKCALL_TAG: ${{ github.sha }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          port: ${{ secrets.VM_SSH_PORT || 22 }}
+          envs: GHCR_TOKEN,GHCR_USER,DESKCALL_IMAGE_PREFIX,DESKCALL_TAG
+          script: |
+            set -e
+            cd ~/deskcall
+            test -f .env || { echo "~/deskcall/.env belum dibuat"; exit 1; }
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+            export DESKCALL_IMAGE_PREFIX DESKCALL_TAG
+            docker compose pull api agent
+            docker logout ghcr.io
+            docker compose up -d --remove-orphans
+            docker image prune -f
+            docker compose ps
+
+  deploy-report:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: [test-agent, test-api]
+    runs-on: ubuntu-latest
+    concurrency: deploy-vercel
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    defaults:
+      run:
+        working-directory: report
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm install -g vercel@59
+      - run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+      - run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+      - run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}

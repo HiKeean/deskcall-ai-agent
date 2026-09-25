@@ -25,7 +25,7 @@ def demo_context(hour: Optional[int] = None, disclose_ai: bool = True) -> CallCo
     return CallContext(
         call_id="demo-1",
         customer_name="Budi Santoso",
-        ai_name="Babi",
+        ai_name="Albert",
         company_name="KlarFinance",
         installment_amount=1_500_000,
         penalty_amount=90_000,

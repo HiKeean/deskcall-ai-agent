@@ -320,7 +320,11 @@ def main() -> None:
     from livekit.agents import WorkerOptions, cli
     load_dotenv(Path(__file__).resolve().parents[3] / ".env")
     logging.basicConfig(level=logging.INFO)
-    cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint, prewarm_fnc=prewarm, agent_name=AGENT_NAME))
+    opts = {}
+    if os.environ.get("DESKCALL_NUM_IDLE_PROCESSES"):
+        # default livekit (prod) = jumlah CPU; tiap proses idle ~130 MB
+        opts["num_idle_processes"] = int(os.environ["DESKCALL_NUM_IDLE_PROCESSES"])
+    cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint, prewarm_fnc=prewarm, agent_name=AGENT_NAME, **opts))
 
 
 if __name__ == "__main__":

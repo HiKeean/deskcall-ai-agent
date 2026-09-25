@@ -1,0 +1,24 @@
+# Deploy api + agent (VM GCP). LiveKit & SQL Server memakai server yang sudah ada (VPS),
+# report di Vercel. Image dibuild & dipush oleh GitHub Actions (.github/workflows/deploy.yml);
+# di VM cukup `docker compose pull && docker compose up -d`. Kredensial dari .env (salin dari .env.example), jangan commit.
+services:
+  api:
+    image: ${DESKCALL_IMAGE_PREFIX:-ghcr.io/hikeean/deskcall}-api:${DESKCALL_TAG:-latest}
+    build: ./api
+    env_file: .env
+    ports: ["5060:8090"]        # api publik di port 5060 (reverse proxy/domain diatur terpisah)
+    mem_limit: 450m
+    restart: unless-stopped
+
+  agent:
+    image: ${DESKCALL_IMAGE_PREFIX:-ghcr.io/hikeean/deskcall}-agent:${DESKCALL_TAG:-latest}
+    build: ./agent
+    env_file: .env
+    environment:
+      DESKCALL_API_URL: http://api:8090
+      DESKCALL_IO_MODE: voice
+      DESKCALL_NUM_IDLE_PROCESSES: "1"
+    depends_on: [api]
+    mem_limit: 1g               # tanpa port: keluar ke LiveKit (wss) & provider STT/LLM/TTS
+    restart: unless-stopped
+

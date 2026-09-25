@@ -39,7 +39,7 @@ class DemoOpeningTest {
 
     static String body(String extra) {
         return """
-                {"externalLoanId":"D-%s","customerName":"Budi","aiName":"Babi","companyName":"KlarFinance",
+                {"externalLoanId":"D-%s","customerName":"Budi","aiName":"Albert","companyName":"KlarFinance",
                  "installmentAmount":1000,"penaltyAmount":0,"dueDate":"2026-09-18","birthDate":"1990-08-17"%s}
                 """.formatted(System.nanoTime(), extra);
     }

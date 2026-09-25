@@ -1,0 +1,22 @@
+# Nginx Proxy Manager: stack sendiri, jalan duluan & terpisah dari deskcall.
+# Di VM: salin file ini ke ~/nginx-proxy-manager/, lalu `docker compose up -d`.
+# Membuat network "proxy" yang dipakai app lain (deskcall api join ke sini).
+# Firewall: 80 & 443 (proxy host + Let's Encrypt), 8080 (admin UI: http://<ip-vm>:8080).
+services:
+  npm:
+    image: jc21/nginx-proxy-manager:latest
+    container_name: nginx-proxy-manager
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:81"           # admin UI
+    volumes:
+      - ./data:/data
+      - ./letsencrypt:/etc/letsencrypt
+    networks: [proxy]
+    mem_limit: 256m
+    restart: unless-stopped
+
+networks:
+  proxy:
+    name: proxy
