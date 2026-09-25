@@ -1,0 +1,67 @@
+spring:
+  application:
+    name: deskcall-api
+  # Kredensial dibaca dari .env di root project (lihat .env.example). Jangan commit .env.
+  config:
+    import:
+      - optional:file:../.env[.properties]
+      - optional:file:.env[.properties]
+  datasource:
+    url: ${DESKCALL_DB_URL}
+    username: ${DESKCALL_DB_USER}
+    password: ${DESKCALL_DB_PASSWORD}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: ${DESKCALL_DDL_AUTO:validate} # skema hanya diubah lewat Flyway; "none" kalau validate false-negative di SQL Server
+    properties:
+      hibernate:
+        default_schema: deskcall
+        use_nationalized_character_data: true
+  flyway:
+    schemas: deskcall
+    default-schema: deskcall
+    create-schemas: true # login DB butuh hak CREATE SCHEMA di run pertama
+    ignore-migration-patterns: "*:missing" # V1 (percobaan salah di DB klarfinance) sudah tercatat, filenya sengaja dihapus
+  mvc:
+    problemdetails:
+      enabled: true
+
+# Swagger UI di /swagger-ui.html, spec di /v3/api-docs. Default MATI; nyalakan hanya di lokal/dev.
+springdoc:
+  api-docs:
+    enabled: ${DESKCALL_SWAGGER_ENABLED:false}
+  swagger-ui:
+    enabled: ${DESKCALL_SWAGGER_ENABLED:false}
+  jackson:
+    default-property-inclusion: non_null
+
+server:
+  port: ${SERVER_PORT:8090}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+deskcall:
+  security:
+    api-keys: ${DESKCALL_API_KEYS} # daftar key dipisah koma
+  livekit:
+    url: ${LIVEKIT_URL} # wss://... ; REST dipanggil lewat https://
+    api-key: ${LIVEKIT_API_KEY}
+    api-secret: ${LIVEKIT_API_SECRET}
+    agent-name: deskcall-agent # dispatch eksplisit, agar tidak nyasar ke room project lain
+    room-prefix: deskcall-
+    token-ttl-seconds: 300
+    room-empty-timeout-seconds: 60
+    http-timeout-seconds: 10
+    customer-can-publish-data: false # true hanya untuk uji mode teks (chat lewat data channel)
+  call:
+    ring-timeout-seconds: 45 # tidak di-accept dalam waktu ini -> NSTD
+    max-duration-seconds: 900 # panggilan tanpa hasil lebih lama dari ini -> OTHERS
+    allow-undisclosed-opening: ${DESKCALL_ALLOW_DEMO_OPENING:false} # true hanya di environment DEMO; izinkan discloseAi=false
+  sweeper:
+    enabled: true
+    interval-ms: 5000

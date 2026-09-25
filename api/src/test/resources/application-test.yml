@@ -1,0 +1,24 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:deskcall-${random.uuid};MODE=MSSQLServer;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE
+    username: sa
+    password: ""
+
+# application.yml ikut membaca ../.env; kunci default fitur ber-flag agar tes tidak bergantung pada .env lokal
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+deskcall:
+  call:
+    allow-undisclosed-opening: false
+  security:
+    api-keys: test-key,other-key
+  livekit:
+    url: wss://livekit.test
+    api-key: testkey
+    api-secret: testsecret-testsecret-testsecret-1234
+  sweeper:
+    enabled: false

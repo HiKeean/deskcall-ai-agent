@@ -1,0 +1,17 @@
+[project]
+name = "deskcall"
+version = "0.1.0"
+description = "AI voice agent untuk desk collection (STT -> LLM -> TTS) di atas LiveKit"
+requires-python = ">=3.9"
+dependencies = []
+
+[project.optional-dependencies]
+# hanya untuk worker LiveKit; butuh Python >= 3.10
+worker = ["livekit-agents>=1.8"]
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
