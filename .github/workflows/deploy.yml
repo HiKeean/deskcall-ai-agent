@@ -11,8 +11,9 @@
 #   VERCEL_TOKEN       https://vercel.com/account/tokens
 #   VERCEL_ORG_ID      dari report/.vercel/project.json (orgId)
 #   VERCEL_PROJECT_ID  dari report/.vercel/project.json (projectId)
+#   DESKCALL_API_URL   URL api yang dipanggil report (mis. https://domain-api)
+#   DESKCALL_API_KEY   API key untuk report (salah satu dari DESKCALL_API_KEYS di VM)
 # Sekali di VM: install Docker, buat ~/deskcall/.env (tidak pernah lewat CI).
-# Env report (DESKCALL_API_URL, DESKCALL_API_KEY) disimpan di project Vercel, bukan di sini.
 name: ci-cd
 
 on:
@@ -145,4 +146,11 @@ jobs:
       - run: npm install -g vercel@59
       - run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
       - run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
-      - run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+      - name: vercel deploy
+        env:
+          DESKCALL_API_URL: ${{ secrets.DESKCALL_API_URL }}
+          DESKCALL_API_KEY: ${{ secrets.DESKCALL_API_KEY }}
+        run: >-
+          vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+          --env DESKCALL_API_URL="$DESKCALL_API_URL"
+          --env DESKCALL_API_KEY="$DESKCALL_API_KEY"
