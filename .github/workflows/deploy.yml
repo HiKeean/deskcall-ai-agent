@@ -11,8 +11,8 @@
 #   VERCEL_TOKEN       https://vercel.com/account/tokens
 #   VERCEL_ORG_ID      dari report/.vercel/project.json (orgId)
 #   VERCEL_PROJECT_ID  dari report/.vercel/project.json (projectId)
-#   DESKCALL_API_URL   URL api yang dipanggil report (mis. https://domain-api)
-#   DESKCALL_API_KEY   API key untuk report (salah satu dari DESKCALL_API_KEYS di VM)
+#   DESKCALL_API_URL   (Secrets atau Variables) URL api yang dipanggil report (mis. https://domain-api)
+#   DESKCALL_API_KEY   (Secrets atau Variables) API key untuk report (salah satu dari DESKCALL_API_KEYS di VM)
 # Sekali di VM: install Docker, buat ~/deskcall/.env (tidak pernah lewat CI).
 name: ci-cd
 
@@ -131,6 +131,9 @@ jobs:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     needs: [test-agent, test-api]
     runs-on: ubuntu-latest
+    # Sama dengan job deploy: secret yang disimpan di environment "production" hanya kebaca
+    # oleh job yang mendeklarasikan environment ini.
+    environment: production
     concurrency: deploy-vercel
     env:
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
@@ -154,9 +157,13 @@ jobs:
       - run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
       - name: vercel deploy
         env:
-          DESKCALL_API_URL: ${{ secrets.DESKCALL_API_URL }}
-          DESKCALL_API_KEY: ${{ secrets.DESKCALL_API_KEY }}
+          # Boleh disimpan di Secrets atau Variables.
+          DESKCALL_API_URL: ${{ secrets.DESKCALL_API_URL || vars.DESKCALL_API_URL }}
+          DESKCALL_API_KEY: ${{ secrets.DESKCALL_API_KEY || vars.DESKCALL_API_KEY }}
         run: >-
+          for v in DESKCALL_API_URL DESKCALL_API_KEY; do
+          [ -n "${!v}" ] || { echo "::error::$v kosong - isi di Settings -> Secrets and variables -> Actions"; exit 1; };
+          done;
           vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
           --env DESKCALL_API_URL="$DESKCALL_API_URL"
           --env DESKCALL_API_KEY="$DESKCALL_API_KEY"
